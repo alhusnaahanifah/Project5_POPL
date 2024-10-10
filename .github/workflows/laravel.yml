@@ -66,6 +66,8 @@ jobs:
     - name: Build and Push Docker Image
       uses: docker/build-push-action@v6
       with:
+        context: .
+        file: ./Dockerfile  # Menentukan path ke Dockerfile
         push: true
         tags: |
           alhusnaahanifah/project5_popl:latest
