@@ -23,7 +23,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '18'
+        node-version: '20'  # Update to Node.js 20
 
     - name: Copy .env
       run: php -r "file_exists('.env') || copy('.env.example', '.env');"
@@ -50,7 +50,7 @@ jobs:
 
     - name: Execute Tests (Unit and Feature tests) via PHPUnit/Pest
       env:
-        DB_CONNECTION: sqlite
+        DB_CONNECTION: sqlite  # Override .env DB settings for testing
         DB_DATABASE: database/database.sqlite
       run: php artisan test
 
@@ -67,7 +67,7 @@ jobs:
       uses: docker/build-push-action@v6
       with:
         context: .
-        file: ./Dockerfile  # Menentukan path ke Dockerfile
+        file: ./Dockerfile  # Make sure this path is correct
         push: true
         tags: |
           alhusnaahanifah/project5_popl:latest
