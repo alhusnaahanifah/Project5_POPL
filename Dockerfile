@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y \
     libxml2-dev \
     libzip-dev \
     npm \
-    && docker-php-ext-install pdo mbstring exif pcntl bcmath gd zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -28,14 +29,14 @@ COPY . .
 # Install dependensi Laravel
 RUN composer install --prefer-dist --no-scripts --no-dev --optimize-autoloader
 
-# Install dependensi npm
+# Salin .env.example jika .env tidak ada
+RUN if [ ! -f .env ]; then cp .env.example .env; fi
+
+# Install dependensi npm dan build assets
 RUN npm install && npm run build
 
 # Set permission untuk storage dan bootstrap/cache
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
-
-# Salin .env.example jika .env tidak ada
-RUN if [ ! -f .env ]; then cp .env.example .env; fi
 
 # Generate key aplikasi Laravel
 RUN php artisan key:generate
