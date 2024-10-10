@@ -9,14 +9,14 @@ on:
       - main
 
 jobs:
-  install:
+  build-and-test:
     runs-on: ubuntu-latest
 
     services:
       mysql:
-        image: mysql:5.7  # Sesuaikan versi MySQL sesuai kebutuhan
+        image: mysql:5.7
         env:
-          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_ROOT_PASSWORD: ''  # Tidak ada password untuk root
           MYSQL_DATABASE: metalk
         ports:
           - 3306:3306
@@ -30,12 +30,11 @@ jobs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: 8.2
-        extensions: mbstring, exif, pcntl, bcmath
+        extensions: mbstring, exif, pcntl, bcmath, pdo_mysql
         ini-values: post_max_size=256M, max_execution_time=180
-        coverage: none
 
     # Install Composer dependencies
-    - name: Install dependencies
+    - name: Install Composer dependencies
       run: composer install --prefer-dist --no-progress --no-suggest --no-interaction
 
     # Copy .env.example to .env
@@ -48,9 +47,12 @@ jobs:
 
     # Wait for MySQL to be ready
     - name: Wait for MySQL to be ready
-      run: sleep 10
+      run: |
+        while ! mysqladmin ping -h"127.0.0.1" --silent; do
+          sleep 1
+        done
 
-    # Run database migrations using the local MySQL service
+    # Run database migrations
     - name: Run migrations
       env:
         DB_CONNECTION: mysql
@@ -58,17 +60,17 @@ jobs:
         DB_PORT: 3306
         DB_DATABASE: metalk
         DB_USERNAME: root
-        DB_PASSWORD: ''
+        DB_PASSWORD: ''  # Kosongkan password
       run: php artisan migrate --force
 
-    # Step 5: Log in to Docker Hub
+    # Log in to Docker Hub
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # Step 6: Build and push Docker image to Docker Hub
+    # Build and push Docker image to Docker Hub
     - name: Build and Push Docker image
       uses: docker/build-push-action@v6
       with:
@@ -77,15 +79,15 @@ jobs:
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/project5_popl:latest
 
-    # Step 7: Deploy the Docker container without MySQL
+    # Deploy Docker container
     - name: Deploy Docker container
       run: |
-        docker run -d -p 80:80 \
+        docker run -d -p 8000:8000 \
           --name laravel_app \
           --env DB_CONNECTION=mysql \
-          --env DB_HOST=${{ secrets.DB_HOST }} \
-          --env DB_PORT=${{ secrets.DB_PORT }} \
-          --env DB_DATABASE=${{ secrets.DB_DATABASE }} \
-          --env DB_USERNAME=${{ secrets.DB_USERNAME }} \
-          --env DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+          --env DB_HOST=127.0.0.1 \
+          --env DB_PORT=3306 \
+          --env DB_DATABASE=metalk \
+          --env DB_USERNAME=root \
+          --env DB_PASSWORD='' \  # Kosongkan password
           ${{ secrets.DOCKERHUB_USERNAME }}/project5_popl:latest
