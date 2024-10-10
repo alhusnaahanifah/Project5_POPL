@@ -1,77 +1,91 @@
-name: Laravel
+name: Laravel CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
-  laravel-tests:
-
+  install:
     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v4
+    services:
+      mysql:
+        image: mysql:5.7  # Sesuaikan versi MySQL sesuai kebutuhan
+        env:
+          MYSQL_ROOT_PASSWORD: ''
+          MYSQL_DATABASE: metalk
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
+    steps:
+    - uses: actions/checkout@v2
+
+    # Setup PHP
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: '8.2'
-        extensions: mbstring, bcmath, pdo_mysql, exif, pcntl, gd
+        php-version: 8.2
+        extensions: mbstring, exif, pcntl, bcmath
+        ini-values: post_max_size=256M, max_execution_time=180
+        coverage: none
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'  # Update to Node.js 20
+    # Install Composer dependencies
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress --no-suggest --no-interaction
 
-    - name: Copy .env
-      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+    # Copy .env.example to .env
+    - name: Copy .env file
+      run: cp .env.example .env
 
-    - name: Install Composer Dependencies
-      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
-
-    - name: Install NPM Dependencies
-      run: npm install
-
-    - name: Build Assets
-      run: npm run build
-
-    - name: Generate Application Key
+    # Generate application key
+    - name: Generate app key
       run: php artisan key:generate
 
-    - name: Set Directory Permissions
-      run: chmod -R 777 storage bootstrap/cache
+    # Wait for MySQL to be ready
+    - name: Wait for MySQL to be ready
+      run: sleep 10
 
-    - name: Create Database
-      run: |
-        mkdir -p database
-        touch database/database.sqlite
-
-    - name: Execute Tests (Unit and Feature tests) via PHPUnit/Pest
+    # Run database migrations using the local MySQL service
+    - name: Run migrations
       env:
-        DB_CONNECTION: sqlite  # Override .env DB settings for testing
-        DB_DATABASE: database/database.sqlite
-      run: php artisan test
+        DB_CONNECTION: mysql
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        DB_DATABASE: metalk
+        DB_USERNAME: root
+        DB_PASSWORD: ''
+      run: php artisan migrate --force
 
-    - name: Verify Docker Image Before Push
-      run: docker images
-
-    - name: Login to Docker Hub
+    # Step 5: Log in to Docker Hub
+    - name: Log in to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and Push Docker Image
+    # Step 6: Build and push Docker image to Docker Hub
+    - name: Build and Push Docker image
       uses: docker/build-push-action@v6
       with:
         context: .
-        file: ./Dockerfile  # Make sure this path is correct
+        file: Dockerfile
         push: true
-        tags: |
-          alhusnaahanifah/project5_popl:latest
-          alhusnaahanifah/project5_popl:${{ github.sha }}
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/project5_popl:latest
 
-    - name: Verify Docker Image After Push
-      run: docker images
+    # Step 7: Deploy the Docker container without MySQL
+    - name: Deploy Docker container
+      run: |
+        docker run -d -p 80:80 \
+          --name laravel_app \
+          --env DB_CONNECTION=mysql \
+          --env DB_HOST=${{ secrets.DB_HOST }} \
+          --env DB_PORT=${{ secrets.DB_PORT }} \
+          --env DB_DATABASE=${{ secrets.DB_DATABASE }} \
+          --env DB_USERNAME=${{ secrets.DB_USERNAME }} \
+          --env DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+          ${{ secrets.DOCKERHUB_USERNAME }}/project5_popl:latest
