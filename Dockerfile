@@ -18,6 +18,9 @@ COPY . /var/www/html
 # Menginstal Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
+# Menyalin file .env.example jika file .env tidak ada
+RUN cp .env.example .env
+
 # Menginstal dependencies menggunakan Composer
 RUN composer install --no-scripts --no-dev --prefer-dist --optimize-autoloader
 
