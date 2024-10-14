@@ -7,6 +7,10 @@ RUN docker-php-ext-install mysqli
 # Menambahkan ServerName ke konfigurasi Apache untuk mengatasi peringatan
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
+# Menginstal dependensi Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN composer install --no-dev --optimize-autoloader
+
 # Menetapkan direktori kerja di dalam container
 WORKDIR /var/www/html
 
@@ -15,10 +19,6 @@ COPY . /var/www/html
 
 # Mengatur hak akses folder jika diperlukan
 RUN chown -R www-data:www-data /var/www/html
-
-# Menginstal dependensi Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-RUN composer install --no-dev --optimize-autoloader
 
 # Membuka port 80 untuk akses HTTP
 EXPOSE 80
