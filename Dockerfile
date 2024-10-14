@@ -10,8 +10,12 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 # Menetapkan direktori kerja di dalam container
 WORKDIR /var/www/html
 
-# Menyalin hanya folder public dari project Laravel ke dalam container
-COPY ./public /var/www/html
+# Menyalin semua file dari project Laravel ke dalam container
+COPY . /var/www/html
+
+# Menginstal dependencies menggunakan Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN composer install --no-dev --optimize-autoloader
 
 # Mengatur hak akses folder jika diperlukan
 RUN chown -R www-data:www-data /var/www/html
